@@ -58,4 +58,6 @@ dependencies {
 
     // 包含pullRefresh功能
     implementation("androidx.compose.material:material")
+    // 导航框架
+    implementation(libs.androidx.navigation.compose)
 }
