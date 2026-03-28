@@ -60,4 +60,6 @@ dependencies {
     implementation("androidx.compose.material:material")
     // 导航框架
     implementation(libs.androidx.navigation.compose)
+    // 添加 WorkManager 依赖
+    implementation(libs.androidx.work.runtime.ktx)
 }
