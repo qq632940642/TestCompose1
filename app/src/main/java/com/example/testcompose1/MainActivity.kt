@@ -11,6 +11,8 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import com.example.testcompose1.data.PreferencesManager
+import com.example.testcompose1.data.TodoDatabase
+import com.example.testcompose1.data.TodoRepository
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -18,6 +20,12 @@ class MainActivity : ComponentActivity() {
         // 手动创建 PreferencesManager 和 SettingsViewModel
         val preferencesManager = PreferencesManager(applicationContext)
         val settingsViewModel = SettingsViewModel(preferencesManager)
+
+        val db = TodoDatabase.getInstance(this)
+        val dao = db.todoDao()
+        val repository = TodoRepository(dao)
+        val viewModel = TodoViewModel(repository)
+
         setContent {
             val isDarkTheme by settingsViewModel.isDarkTheme.collectAsState()
             MyAppTheme(
@@ -32,18 +40,19 @@ class MainActivity : ComponentActivity() {
                 ) {
                     composable("list") {
                         TodoListScreen(
+                            viewModel = viewModel,
                             settingsViewModel = settingsViewModel,
-                            onNavigateToDetail = { itemId ->
-                                navController.navigate("detail/$itemId")
+                            onNavigateToDetail = { id ->
+                                navController.navigate("detail/$id")
                             }
                         )
                     }
 
                     // detail/{itemId} 是带参数的页面路径
-                    composable("detail/{itemId}") { backStackEntry ->
-                        val itemId = backStackEntry.arguments?.getString("itemId") ?: ""
+                    composable("detail/{id}") { backStackEntry ->
+                        val id = backStackEntry.arguments?.getString("id") ?: ""
                         TodoDetailScreen(
-                            itemId = itemId,
+                            itemId = id,
                             onBack = { navController.popBackStack() }
                         )
                     }
