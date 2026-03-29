@@ -62,4 +62,6 @@ dependencies {
     implementation(libs.androidx.navigation.compose)
     // 添加 WorkManager 依赖
     implementation(libs.androidx.work.runtime.ktx)
+
+    implementation(libs.androidx.datastore.preferences)
 }

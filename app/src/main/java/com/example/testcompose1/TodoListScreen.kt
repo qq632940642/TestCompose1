@@ -62,10 +62,10 @@ import kotlinx.coroutines.launch
 import java.util.Collections.rotate
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
-@Preview
 @Composable
 fun TodoListScreen(
     viewModel: TodoViewModel = viewModel(),  // 获取ViewModel实例。 在同一个activity作用域中是单例。
+    settingsViewModel: SettingsViewModel,
     onNavigateToDetail: (String) -> Unit = {}
 ) {
     val screenWidth = LocalConfiguration.current.screenWidthDp.dp.value
@@ -129,7 +129,7 @@ fun TodoListScreen(
         }
 
         Column(modifier = Modifier.padding(16.dp)) {
-            ThemeSwitch()  // 添加开关
+            ThemeSwitch(settingsViewModel)  // 添加开关
             Spacer(modifier = Modifier.height(8.dp))
             // 文本输入框
             TextField(
@@ -249,7 +249,8 @@ fun TodoItemRow(item: String, onDelete: () -> Unit  // 添加删除回调，删�
 
 // 主题切换开关
 @Composable
-fun ThemeSwitch() {
+fun ThemeSwitch(settingsViewModel: SettingsViewModel) {
+    val isDarkTheme by settingsViewModel.isDarkTheme.collectAsState()
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -265,18 +266,18 @@ fun ThemeSwitch() {
             color = MaterialTheme.colorScheme.onSurface
         )
         Switch(
-            checked = ThemeManager.isDarkTheme,
-            onCheckedChange = { ThemeManager.toggleTheme() }
+            checked = isDarkTheme,
+            onCheckedChange = { settingsViewModel.toggleDarkMode() }
         )
     }
 }
 
 // 为了允许手动切换深色/浅色模式，在应用中保存用户的选择，并在主题中读取. 后面改用DataStore保存
-object ThemeManager {
-    var isDarkTheme by mutableStateOf(false)
-        private set
-
-    fun toggleTheme() { // 切换是否为深色主题
-        isDarkTheme = !isDarkTheme
-    }
-}
+//object ThemeManager {
+//    var isDarkTheme by mutableStateOf(false)
+//        private set
+//
+//    fun toggleTheme() { // 切换是否为深色主题
+//        isDarkTheme = !isDarkTheme
+//    }
+//}

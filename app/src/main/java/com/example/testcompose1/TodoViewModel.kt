@@ -19,7 +19,7 @@ class TodoViewModel : ViewModel() {
         viewModelScope.launch {
             // 模拟加载数据
             delay(2000)
-            _todoItems.value = listOf("人中吕布，马中赤兔", "花无百日红", "人无再少年")
+            _todoItems.value = listOf("人中吕布，马中赤兔", "花无百日红", "人无再少年", "人生像客旅", "日光之下无新鲜事")
         }
     }
 
