@@ -117,7 +117,8 @@ fun TodoListScreen(
             todos.forEach { todo ->
                 if (!itemVisibility.containsKey(todo.id)) {
                     // 新项：初始不可见
-                    itemVisibility[todo.id] = false
+//                    itemVisibility[todo.id] = false
+                    itemVisibility[todo.id] = true // 动画有问题，导致数据看不到
                     // 等待一帧，然后设为可见，触发进入动画
                     launch {
                         delay(50) // 短暂延迟，确保重组
