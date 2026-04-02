@@ -109,27 +109,24 @@ fun TodoListScreen(
 
         // 获取协程作用域，用于延迟删除
         val scope = rememberCoroutineScope()
-        // 管理每个项的可见性，初始为 true，新添加的项先设为 false，然后立即设为 true
-        val itemVisibility = remember { mutableStateMapOf<Int, Boolean>() } // key改为用id
+        // 管理每项的 AnimatedVisibility；新 id 先 false 再 true 以触发进入动画
+        val itemVisibility = remember { mutableStateMapOf<Int, Boolean>() }
 
-        // 同步 itemVisibility 与 todoItems：为新增项添加初始 false，并在下一帧设为 true
-        LaunchedEffect(todos) {
-            todos.forEach { todo ->
-                if (!itemVisibility.containsKey(todo.id)) {
-                    // 新项：初始不可见
-//                    itemVisibility[todo.id] = false
-                    itemVisibility[todo.id] = true // 动画有问题，导致数据看不到
-                    // 等待一帧，然后设为可见，触发进入动画
-                    launch {
-                        delay(50) // 短暂延迟，确保重组
-                        itemVisibility[todo.id] = true
+        // 必须用 collect 持续监听，不能用 LaunchedEffect(todos)：Room 每次发射新 List 都会让
+        // LaunchedEffect 重启并取消子协程，导致 delay(50) 里「设为可见」永远跑不完，界面一直空白。
+        LaunchedEffect(Unit) {
+            viewModel.todos.collect { current ->  // 持续监听，该协程不会因为新数据而重启
+                current.forEach { todo ->
+                    if (!itemVisibility.containsKey(todo.id)) {
+                        itemVisibility[todo.id] = false
+                        launch {
+                            delay(50)
+                            itemVisibility[todo.id] = true
+                        }
                     }
                 }
+                itemVisibility.keys.retainAll(current.map { it.id }.toSet())
             }
-            // 清理已删除的项
-//            itemVisibility.keys.retainAll(todoItems.toSet())
-            val currentIds = todos.map { it.id }.toSet()
-            itemVisibility.keys.retainAll(currentIds)
         }
 
         Column(modifier = Modifier.padding(16.dp)) {
