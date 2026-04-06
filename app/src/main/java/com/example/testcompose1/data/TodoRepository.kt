@@ -50,6 +50,8 @@ class TodoRepository(private val dao: TodoDao) {
     suspend fun updateTodo(todo: TodoEntity) {
         dao.update(todo)
     }
+
+    suspend fun getTodoById(id: Int): TodoEntity? = dao.getTodoById(id)
 }
 
 /**

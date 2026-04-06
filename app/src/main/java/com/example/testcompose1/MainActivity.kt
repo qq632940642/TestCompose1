@@ -5,11 +5,13 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.navigation.NavType
 
 import com.example.testcompose1.ui.theme.MyAppTheme
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
+import androidx.navigation.navArgument
 import com.example.testcompose1.data.PreferencesManager
 import com.example.testcompose1.data.TodoDatabase
 import com.example.testcompose1.data.TodoRepository
@@ -49,10 +51,13 @@ class MainActivity : ComponentActivity() {
                     }
 
                     // detail/{itemId} 是带参数的页面路径
-                    composable("detail/{id}") { backStackEntry ->
-                        val id = backStackEntry.arguments?.getString("id") ?: ""
+                    composable("detail/{todoId}",
+                            arguments = listOf(navArgument("todoId") { type = NavType.IntType })
+                    ) { backStackEntry ->
+                        val todoId = backStackEntry.arguments?.getInt("todoId") ?: 0
                         TodoDetailScreen(
-                            itemId = id,
+                            todoId  = todoId,
+                            viewModel = viewModel,
                             onBack = { navController.popBackStack() }
                         )
                     }

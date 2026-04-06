@@ -18,6 +18,9 @@ interface TodoDao {
     @Query("SELECT * FROM todo_items ORDER BY createdAt DESC")
     fun getTodosPaged(): PagingSource<Int, TodoEntity>
 
+    @Query("SELECT * FROM todo_items WHERE id = :id")
+    suspend fun getTodoById(id: Int): TodoEntity?   // 挂起函数，返回单个待办
+
     @Insert
     suspend fun insert(todo: TodoEntity)
 
