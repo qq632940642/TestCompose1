@@ -1,13 +1,5 @@
 package com.example.testcompose1
 
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.FastOutSlowInEasing
-import androidx.compose.animation.core.tween
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.scaleIn
-import androidx.compose.animation.slideInHorizontally
-import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -16,19 +8,25 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.material.ExperimentalMaterialApi
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.pullrefresh.PullRefreshIndicator
+import androidx.compose.material.pullrefresh.pullRefresh
+import androidx.compose.material.pullrefresh.rememberPullRefreshState
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Checkbox
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -40,46 +38,31 @@ import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.platform.LocalConfiguration
-import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.style.TextDecoration
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.paging.LoadState
+import androidx.paging.compose.collectAsLazyPagingItems
+import androidx.paging.compose.itemKey
 import com.example.testcompose1.data.TodoEntity
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
-import java.util.Collections.rotate
+import com.example.testcompose1.data.TodoRepository
 
-@OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class, ExperimentalMaterialApi::class)
 @Composable
 fun TodoListScreen(
-    viewModel: TodoViewModel,  // 获取ViewModel实例。 在同一个activity作用域中是单例。
+    viewModel: TodoViewModel,
     settingsViewModel: SettingsViewModel,
     onNavigateToDetail: (Int) -> Unit = {}
 ) {
-//    val screenWidth = LocalConfiguration.current.screenWidthDp.dp.value
-    val configuration = LocalConfiguration.current
-    val density = LocalDensity.current
-    val screenWidthPx = with(density) { configuration.screenWidthDp.dp.toPx() }
-    val offsetX = -(screenWidthPx * 3).toInt()  // 从屏幕左侧3倍宽度外滑入
-
     var showInfiniteList by remember { mutableStateOf(false) }
     if (showInfiniteList) {
-        // 显示无限滚动列表，并提供一个返回按钮
         Scaffold(
             topBar = {
                 TopAppBar(
@@ -92,121 +75,130 @@ fun TodoListScreen(
                 )
             }
         ) { innerPadding ->
-            // 给 InfiniteListPage 添加内边距
             Box(modifier = Modifier.padding(innerPadding)) {
                 InfiniteListPage()
             }
         }
-    } else { // 显示原待办事项列表
-        // 使用 remember 和 mutableStateOf 保存输入框的文本
+    } else {
+        val lazyPagingItems = viewModel.todoPagingFlow.collectAsLazyPagingItems()
+
+        // 已有数据时的下拉刷新才显示指示器，避免首屏空白时一直转圈
+        val pullRefreshing =
+            lazyPagingItems.loadState.refresh is LoadState.Loading && lazyPagingItems.itemCount > 0
+        val pullRefreshState = rememberPullRefreshState(
+            refreshing = pullRefreshing,
+            onRefresh = { lazyPagingItems.refresh() }
+        )
+
         var text by remember { mutableStateOf("") }
-        // 使用 mutableStateListOf 保存待办项列表
-//    val todoItems = remember { mutableStateListOf<String>() }
-        // 将 StateFlow 转换为 Compose 可观察的 State
-//        val todoItems by viewModel.todoItems.collectAsState()
 
-        val todos by viewModel.todos.collectAsState()
-
-        // 获取协程作用域，用于延迟删除
-        val scope = rememberCoroutineScope()
-        // 管理每项的 AnimatedVisibility；新 id 先 false 再 true 以触发进入动画
-        val itemVisibility = remember { mutableStateMapOf<Int, Boolean>() }
-
-        // 必须用 collect 持续监听，不能用 LaunchedEffect(todos)：Room 每次发射新 List 都会让
-        // LaunchedEffect 重启并取消子协程，导致 delay(50) 里「设为可见」永远跑不完，界面一直空白。
-        LaunchedEffect(Unit) {
-            viewModel.todos.collect { current ->  // 持续监听，该协程不会因为新数据而重启
-                current.forEach { todo ->
-                    if (!itemVisibility.containsKey(todo.id)) {
-                        itemVisibility[todo.id] = false
-                        launch {
-                            delay(50)
-                            itemVisibility[todo.id] = true
-                        }
-                    }
-                }
-                itemVisibility.keys.retainAll(current.map { it.id }.toSet())
-            }
-        }
-
-        Column(modifier = Modifier.padding(16.dp)) {
-            ThemeSwitch(settingsViewModel)  // 添加开关
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(16.dp)
+        ) {
+            ThemeSwitch(settingsViewModel)
             Spacer(modifier = Modifier.height(8.dp))
-            // 文本输入框
             TextField(
                 value = text,
-                onValueChange = { text = it }, // 反向绑定，视图变化--> 数据变化
+                onValueChange = { text = it },
                 label = { Text("输入待办事项") },
                 colors = TextFieldDefaults.colors(
-                    focusedContainerColor = MaterialTheme.colorScheme.surface, // 获得焦点时的背景色
-                    unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant, // 失去焦点时，输入框背景色
-                    focusedIndicatorColor = MaterialTheme.colorScheme.primary, // 输入框底部下划线的颜色。
+                    focusedContainerColor = MaterialTheme.colorScheme.surface,
+                    unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
+                    focusedIndicatorColor = MaterialTheme.colorScheme.primary,
                     unfocusedIndicatorColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
                 ),
                 modifier = Modifier.fillMaxWidth()
             )
-            // 添加按钮
             Button(
                 onClick = {
                     viewModel.addTodo(text)
                     text = ""
                 },
-                shape = MaterialTheme.shapes.small,  // 使用主题形状
+                shape = MaterialTheme.shapes.small,
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = MaterialTheme.colorScheme.primary, // 容器背景色，按钮底色
-                    contentColor = MaterialTheme.colorScheme.onPrimary // 内容颜色，按钮上文字 / 图标的颜色
+                    containerColor = MaterialTheme.colorScheme.primary,
+                    contentColor = MaterialTheme.colorScheme.onPrimary
                 ),
                 modifier = Modifier.padding(top = 8.dp)
             ) {
                 Text("添加")
             }
 
-            // 显示待办列表
             Spacer(modifier = Modifier.height(16.dp))
-            Text("待办列表", style = MaterialTheme.typography.titleMedium)
-            LazyColumn {
-                items(items = todos
-                ,key = { it.id }) //  使用唯一 id 作为 key，确保动画正确识别
-                { todo ->
-                    val visible = itemVisibility[todo.id] ?: true
-                    // 为每个项添加动画。 AnimatedVisibility没起作用
-                    AnimatedVisibility(
-                        visible = visible,
-                        enter = fadeIn(animationSpec = tween(1500, easing = FastOutSlowInEasing)) +
-                                slideInHorizontally(
-                                    initialOffsetX = { -3000 },  // 固定大偏移量，从左侧 3000 像素外滑入
-                                    animationSpec = tween(1500, easing = FastOutSlowInEasing)
-                                ) +
-                                scaleIn(
-                                    initialScale = 0.1f,
-                                    animationSpec = tween(1500, easing = FastOutSlowInEasing)
-                                ),
-                        exit = fadeOut(animationSpec = tween(500)) +
-                                slideOutHorizontally(targetOffsetX = { 200 }
-                                    , animationSpec = tween(500))
-                    ) {
-                        // SideEffect 是一个专门用于执行副作用的可组合函数。它的主要作用是在每次 重组（recomposition） 时，安全地执行那些不直接影响 UI、但需要与外部系统交互的操作（例如日志记录、埋点、更新非 Compose 管理的状态等）。
-                        SideEffect {
-                            println("Item ${todo.title} 显示动画执行")
+            Text("待办列表（每页 ${TodoRepository.PAGE_SIZE} 条，上拉加载更多）", style = MaterialTheme.typography.titleMedium)
+
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxWidth()
+            ) {
+                LazyColumn(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .pullRefresh(pullRefreshState)
+                ) {
+                    items(
+                        count = lazyPagingItems.itemCount,
+                        key = lazyPagingItems.itemKey { it.id }
+                    ) { index ->
+                        val todo = lazyPagingItems[index]
+                        if (todo != null) {
+                            TodoItemRow(
+                                todo = todo,
+                                onDelete = { viewModel.deleteTodo(todo) },
+                                onToggle = { viewModel.toggleComplete(todo) },
+                                onClick = { onNavigateToDetail(todo.id) }
+                            )
+                        } else {
+                            Spacer(Modifier.height(72.dp))
                         }
-                        TodoItemRow(todo = todo
-                            , onDelete = {
-                                // 触发删除动画
-                                itemVisibility[todo.id] = false
-                                scope.launch {
-                                    delay(500)
-//                                    viewModel.removeItem(item)
-//                                    deletingItems = deletingItems - item
-                                    viewModel.deleteTodo(todo)
-                                    // 清理状态由 LaunchedEffect 的 retainAll 负责
-                                }
-                             }
-                               ,onToggle = {
-                                viewModel.toggleComplete(todo)  // 切换完成状态
-                            }
-                            , onClick = { onNavigateToDetail(todo.id) }// 点击跳转
-                        )
                     }
+
+                    item {
+                        when (val append = lazyPagingItems.loadState.append) {
+                            is LoadState.Loading -> {
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(16.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    CircularProgressIndicator()
+                                }
+                            }
+
+                            is LoadState.Error -> {
+                                Text(
+                                    text = "加载更多失败：${append.error.localizedMessage}",
+                                    color = MaterialTheme.colorScheme.error,
+                                    modifier = Modifier.padding(16.dp)
+                                )
+                            }
+
+                            else -> {}
+                        }
+                    }
+                }
+
+                PullRefreshIndicator(
+                    refreshing = pullRefreshing,
+                    state = pullRefreshState,
+                    modifier = Modifier.align(Alignment.TopCenter)
+                )
+
+                if (lazyPagingItems.loadState.refresh is LoadState.Loading && lazyPagingItems.itemCount == 0) {
+                    CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
+                }
+
+                val refreshError = lazyPagingItems.loadState.refresh as? LoadState.Error
+                if (refreshError != null && lazyPagingItems.itemCount == 0) {
+                    Text(
+                        text = "加载失败：${refreshError.error.localizedMessage}",
+                        color = MaterialTheme.colorScheme.error,
+                        modifier = Modifier.align(Alignment.Center)
+                    )
                 }
             }
         }
@@ -215,21 +207,19 @@ fun TodoListScreen(
 
 @Composable
 fun TodoItemRow(
-                todo: TodoEntity
-                , onDelete: () -> Unit  // 添加删除回调，删除逻辑放在上层。即把回调传给里面的按钮。
-                ,onToggle: () -> Unit
-    , onClick: () -> Unit
-    , modifier: Modifier = Modifier
+    todo: TodoEntity,
+    onDelete: () -> Unit,
+    onToggle: () -> Unit,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
 ) {
     Card(
         modifier = modifier
             .fillMaxWidth()
             .padding(vertical = 4.dp)
-            .clickable { onClick() }, // 现在 modifier 应该会叠加动画修饰符
-        elevation = CardDefaults.cardElevation(
-            defaultElevation = 2.dp // 这里传你要的默认高度
-        ),
-        shape = MaterialTheme.shapes.medium,  // 使用主题形状
+            .clickable { onClick() },
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+        shape = MaterialTheme.shapes.medium,
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surface
         )
@@ -239,27 +229,29 @@ fun TodoItemRow(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(vertical = 8.dp),
-            horizontalArrangement = Arrangement.SpaceBetween // 横向布局子元素两端对齐，剩余空白空间平均分配到子元素之间
+            horizontalArrangement = Arrangement.SpaceBetween
         ) {
-            // 新增Checkbox，切换事项是否已完成的状态
             Checkbox(
                 checked = todo.isCompleted,
                 onCheckedChange = { onToggle() }
             )
-            Text(text = todo.title
-                ,style = MaterialTheme.typography.bodyLarge,
-                color = MaterialTheme.colorScheme.onSurface
-                ,textDecoration = if (todo.isCompleted) TextDecoration.LineThrough else null // LineThrough是中划线
+            Text(
+                text = todo.title,
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onSurface,
+                textDecoration = if (todo.isCompleted) TextDecoration.LineThrough else null
             )
             IconButton(onClick = onDelete) {
-                Icon(Icons.Default.Delete, contentDescription = "删除"
-                    , tint = MaterialTheme.colorScheme.error)
+                Icon(
+                    Icons.Default.Delete,
+                    contentDescription = "删除",
+                    tint = MaterialTheme.colorScheme.error
+                )
             }
         }
     }
 }
 
-// 主题切换开关
 @Composable
 fun ThemeSwitch(settingsViewModel: SettingsViewModel) {
     val isDarkTheme by settingsViewModel.isDarkTheme.collectAsState()
@@ -283,13 +275,3 @@ fun ThemeSwitch(settingsViewModel: SettingsViewModel) {
         )
     }
 }
-
-// 为了允许手动切换深色/浅色模式，在应用中保存用户的选择，并在主题中读取. 后面改用DataStore保存
-//object ThemeManager {
-//    var isDarkTheme by mutableStateOf(false)
-//        private set
-//
-//    fun toggleTheme() { // 切换是否为深色主题
-//        isDarkTheme = !isDarkTheme
-//    }
-//}
