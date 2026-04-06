@@ -8,6 +8,9 @@ import com.example.testcompose1.data.TodoEntity
 import com.example.testcompose1.data.TodoRepository
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
 class TodoViewModel(
@@ -35,6 +38,30 @@ class TodoViewModel(
     fun toggleComplete(todo: TodoEntity) {
         viewModelScope.launch {
             repository.updateTodo(todo.copy(isCompleted = !todo.isCompleted))
+        }
+    }
+
+    // 单个待办
+    private val _currentTodo = MutableStateFlow<TodoEntity?>(null)
+    val currentTodo: StateFlow<TodoEntity?> = _currentTodo.asStateFlow()
+
+    private val _isLoading = MutableStateFlow(false)
+    val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
+
+    fun loadTodoById(id: Int) {
+        viewModelScope.launch {
+            _isLoading.value = true
+            val todo = repository.getTodoById(id)
+            _currentTodo.value = todo
+            _isLoading.value = false
+        }
+    }
+
+    fun updateTodo(todo: TodoEntity) {
+        viewModelScope.launch {
+            _isLoading.value = true
+            repository.updateTodo(todo)
+            _isLoading.value = false
         }
     }
 }

@@ -9,6 +9,7 @@ data class TodoEntity(
     @PrimaryKey(autoGenerate = true)
     val id: Int = 0,
     val title: String,
+    val description: String = "", // 新增的详情字段，并指定默认值
     val isCompleted: Boolean = false, // 是否已完成
     val createdAt: Long = System.currentTimeMillis()
 )
