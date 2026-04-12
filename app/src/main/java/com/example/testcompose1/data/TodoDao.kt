@@ -29,4 +29,10 @@ interface TodoDao {
 
     @Update
     suspend fun update(todo: TodoEntity)
+
+    @Query("SELECT COUNT(*) FROM todo_items")
+    fun getTotalCount(): Flow<Int>
+
+    @Query("SELECT COUNT(*) FROM todo_items WHERE isCompleted = 1")
+    fun getCompletedCount(): Flow<Int>
 }

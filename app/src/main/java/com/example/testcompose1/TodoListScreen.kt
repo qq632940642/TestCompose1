@@ -127,7 +127,11 @@ fun TodoListScreen(
             }
 
             Spacer(modifier = Modifier.height(16.dp))
-            Text("待办列表（每页 ${TodoRepository.PAGE_SIZE} 条，上拉加载更多）", style = MaterialTheme.typography.titleMedium)
+
+            val totalCount by viewModel.totalCount.collectAsState()
+            val completedCount by viewModel.completedCount.collectAsState()
+
+            Text("待办列表（每页 ${TodoRepository.PAGE_SIZE} 条，已完成:${completedCount},总数:${totalCount}）", style = MaterialTheme.typography.titleMedium)
 
             Box(
                 modifier = Modifier

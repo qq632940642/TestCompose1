@@ -52,6 +52,10 @@ class TodoRepository(private val dao: TodoDao) {
     }
 
     suspend fun getTodoById(id: Int): TodoEntity? = dao.getTodoById(id)
+
+    fun getTotalCount(): Flow<Int> = dao.getTotalCount()
+
+    fun getCompletedCount(): Flow<Int> = dao.getCompletedCount()
 }
 
 /**
