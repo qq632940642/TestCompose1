@@ -21,6 +21,27 @@ class TodoViewModel(
     val todoPagingFlow: Flow<PagingData<TodoEntity>> =
         repository.getTodosPaged().cachedIn(viewModelScope)
 
+    // 统计信息
+    private val _totalCount = MutableStateFlow(0)
+    val totalCount: StateFlow<Int> = _totalCount.asStateFlow()
+
+    private val _completedCount = MutableStateFlow(0)
+    val completedCount: StateFlow<Int> = _completedCount.asStateFlow()
+
+    init {
+        viewModelScope.launch {
+            repository.getTotalCount().collect { count ->
+                _totalCount.value = count
+            }
+        }
+
+        viewModelScope.launch {
+            repository.getCompletedCount().collect { count ->
+                _completedCount.value = count
+            }
+        }
+    }
+
     fun addTodo(title: String) {
         if (title.isNotBlank()) {
             viewModelScope.launch {
